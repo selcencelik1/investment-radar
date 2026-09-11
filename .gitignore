@@ -1,0 +1,9 @@
+.venv/
+.env
+__pycache__/
+.pytest_cache/
+.idea/
+*.pyc
+.DS_Store
+
+data/archive_summary.json

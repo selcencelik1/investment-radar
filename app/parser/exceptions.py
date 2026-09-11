@@ -1,0 +1,2 @@
+class InvestmentTableNotFoundError(RuntimeError):
+    pass
