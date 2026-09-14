@@ -8,7 +8,20 @@ from app.database.applicant_repository import (
     get_application_years,
     save_applicants,
 )
+from app.ai.answer_generator import generate_research_answer
+from app.ai.research_assistant import (
+    research_investment_question,
+)
 from urllib.parse import urlsplit
+from app.ai.ollama_client import (
+    LocalAIError,
+    generate_review_brief,
+)
+from app.ai.review_context import (
+    build_database_review_context,
+    build_investment_history,
+)
+from app.ai.review_prompt import build_review_messages
 
 from app.database.investment_repository import (
     get_all_investment_records,
@@ -605,7 +618,181 @@ def show_archive_summary() -> None:
             "Annual and quarterly reports may include the same deals. "
             "Source record counts are not unique investment counts."
         )
+def show_ai_research_assistant() -> None:
+    st.caption(
+        "Ask questions about startup investments, investors, "
+        "sectors, years, funding amounts, and applicant status. "
+        "Answers use only records available in the local database."
+    )
 
+    if "ai_research_messages" not in st.session_state:
+        st.session_state["ai_research_messages"] = []
+
+    if st.button(
+            "Clear conversation",
+            key="clear_ai_research_conversation",
+    ):
+        st.session_state["ai_research_messages"] = []
+        st.rerun()
+
+    for message in st.session_state["ai_research_messages"]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+            results = message.get("results", [])
+
+            if results:
+                result_rows = [
+                    {
+                        "Startup": result["startup_name"],
+                        "Sector": result["sector"],
+                        "Year": result["year"],
+                        "Amount (million USD)": (
+                            result["amount_million_usd"]
+                        ),
+                        "Investors": result["investors"],
+                        "Applicant": (
+                            "Yes"
+                            if result["is_applicant"]
+                            else "No"
+                        ),
+                        "Source": (
+                            result["source_urls"][0]
+                            if result["source_urls"]
+                            else None
+                        ),
+                    }
+                    for result in results
+                ]
+
+                with st.expander(
+                        f"Evidence records — {len(results)}"
+                ):
+                    st.dataframe(
+                        pd.DataFrame(result_rows),
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Source": st.column_config.LinkColumn(
+                                "Open source"
+                            ),
+                        },
+                    )
+
+    question = st.chat_input(
+        "Ask about startup investments",
+        key="ai_research_question",
+    )
+
+    if not question:
+        return
+
+    st.session_state["ai_research_messages"].append({
+        "role": "user",
+        "content": question,
+    })
+
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    with st.chat_message("assistant"):
+        try:
+            with st.spinner(
+                    "Searching local investment records..."
+            ):
+                research = research_investment_question(
+                    question=question,
+                )
+
+                if research["clarification_question"]:
+                    response_text = research[
+                        "clarification_question"
+                    ]
+
+                    response_results = []
+
+                else:
+                    generated_answer = generate_research_answer(
+                        question=question,
+                        interpreted_query=research["query"],
+                        results=research["results"],
+                    )
+
+                    response_text = generated_answer["answer"]
+                    response_results = research["results"]
+
+            st.markdown(response_text)
+
+            if response_results:
+                result_rows = [
+                    {
+                        "Startup": result["startup_name"],
+                        "Sector": result["sector"],
+                        "Year": result["year"],
+                        "Amount (million USD)": (
+                            result["amount_million_usd"]
+                        ),
+                        "Investors": result["investors"],
+                        "Applicant": (
+                            "Yes"
+                            if result["is_applicant"]
+                            else "No"
+                        ),
+                        "Source": (
+                            result["source_urls"][0]
+                            if result["source_urls"]
+                            else None
+                        ),
+                    }
+                    for result in response_results
+                ]
+
+                with st.expander(
+                        f"Evidence records — "
+                        f"{len(response_results)}"
+                ):
+                    st.dataframe(
+                        pd.DataFrame(result_rows),
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Source": (
+                                st.column_config.LinkColumn(
+                                    "Open source"
+                                )
+                            ),
+                        },
+                    )
+
+            st.caption(
+                "The answer uses only records available in the "
+                "local database. Available records may not represent "
+                "a startup's complete investment history."
+            )
+
+            st.session_state[
+                "ai_research_messages"
+            ].append({
+                "role": "assistant",
+                "content": response_text,
+                "results": response_results,
+            })
+
+        except (ValueError, LocalAIError) as error:
+            error_text = (
+                "The local research assistant could not complete "
+                f"the request: {error}"
+            )
+
+            st.error(error_text)
+
+            st.session_state[
+                "ai_research_messages"
+            ].append({
+                "role": "assistant",
+                "content": error_text,
+                "results": [],
+            })
 def main() -> None:
     st.set_page_config(
         page_title="Investment Radar",
@@ -1266,54 +1453,7 @@ def main() -> None:
             mime="text/csv",
             key="investor_detail_download",
         )
-        st.divider()
-        st.subheader("Review selected applicant")
 
-        review_target = st.selectbox(
-            "Open an applicant",
-            options=[
-                None,
-                *selected_applications,
-            ],
-            format_func=lambda value: (
-                "Select an applicant"
-                if value is None
-                else startup_labels[value]
-            ),
-            key="comparison_review_target",
-        )
-
-        if review_target is not None:
-            selected_application = (
-                comparison_candidates[
-                    comparison_candidates[
-                        "_selection_key"
-                    ].eq(review_target)
-                ].iloc[0]
-            )
-
-            reviewed_startup_name = (
-                selected_application["Startup"]
-            )
-            reviewed_application_year = int(
-                selected_application[
-                    "Application Year"
-                ]
-            )
-
-            show_applicant_details(
-                startup_name=reviewed_startup_name,
-                application_year=(
-                    reviewed_application_year
-                ),
-            )
-
-            show_startup_review_form(
-                startup_name=reviewed_startup_name,
-                application_year=(
-                    reviewed_application_year
-                ),
-            )
 
         st.caption(
             "The deal amount is the total funding round amount; "
@@ -2024,6 +2164,167 @@ def main() -> None:
         )
 
         return
+    def show_local_ai_review(
+            startup_name: str,
+            application_year: int | None,
+    ) -> None:
+        st.subheader("Local AI Review Brief")
+
+        st.caption(
+            "The brief is generated locally from available "
+            "application and investment data. It supports human "
+            "review and does not make an investment decision."
+        )
+
+        applicant_details = get_applicant_details(
+            startup_name=startup_name,
+            application_year=application_year,
+        )
+
+        if applicant_details:
+            applicant_context = build_database_review_context(
+                applicant_details[0]
+            )
+
+            missing_sections = applicant_context[
+                "data_availability"
+            ]["missing_sections"]
+
+            if missing_sections:
+                st.warning(
+                    "Some application sections are missing. "
+                    "The local AI brief will use the available "
+                    "application and investment data."
+                )
+
+        else:
+            applicant_context = {
+                "application": {
+                    "year": None,
+                    "data_available": False,
+                },
+                "company": {
+                    "name": startup_name,
+                },
+            }
+
+            st.info(
+                "No application data is available for this startup. "
+                "The brief will use investment records only."
+            )
+
+        company_key = normalize_startup_name(startup_name)
+
+        company_records = [
+            record
+            for record in get_all_investment_records()
+            if normalize_startup_name(record.startup_name)
+            == company_key
+        ]
+
+        investment_groups = group_investment_records(
+            company_records
+        )
+
+        investment_history = build_investment_history(
+            investment_groups
+        )
+
+        st.caption(
+            f"Application record available: "
+            f"{'Yes' if applicant_details else 'No'} · "
+            f"Investment rounds available: "
+            f"{len(investment_history)}"
+        )
+
+        result_key = (
+            "local_ai_review_"
+            + company_key.replace(" ", "_")
+            + "_"
+            + str(application_year)
+        )
+
+        if st.button(
+                "Generate Local AI Brief",
+                key=f"generate_{result_key}",
+        ):
+            messages = build_review_messages(
+                applicant_context=applicant_context,
+                investment_history=investment_history,
+            )
+
+            try:
+                with st.spinner(
+                    "The local model is preparing the brief..."
+                ):
+                    review_brief = generate_review_brief(
+                        messages
+                    )
+
+                st.session_state[result_key] = review_brief
+
+            except LocalAIError as error:
+                st.error(str(error))
+
+        review_brief = st.session_state.get(result_key)
+
+        if review_brief is None:
+            return
+
+        st.markdown("#### Company summary")
+        st.write(review_brief["company_summary"])
+
+        st.markdown("#### Business model")
+        st.write(review_brief["business_model_summary"])
+
+        st.markdown("#### Investment history")
+        st.write(
+            review_brief["investment_history_summary"]
+        )
+
+        def show_ai_list(
+                title: str,
+                items: list[str],
+        ) -> None:
+            st.markdown(f"#### {title}")
+
+            if not items:
+                st.caption("No items were produced.")
+                return
+
+            for item in items:
+                st.markdown(f"- {item}")
+
+        show_ai_list(
+            "Traction highlights",
+            review_brief["traction_highlights"],
+        )
+
+        show_ai_list(
+            "Data-quality observations",
+            review_brief["data_quality_observations"],
+        )
+
+        show_ai_list(
+            "Questions for human review",
+            review_brief["review_questions"],
+        )
+
+        show_ai_list(
+            "Evidence sources",
+            review_brief["evidence_sources"],
+        )
+
+        show_ai_list(
+            "Limitations",
+            review_brief["limitations"],
+        )
+
+        st.warning(
+            "This AI-generated brief may contain errors. "
+            "Review the application and original sources before "
+            "using the information."
+        )
     selected_company = st.session_state.get("_selected_company")
 
     if selected_company is not None:
@@ -2106,6 +2407,14 @@ def main() -> None:
             startup_name=company_name,
             application_year=selected_application_year,
         )
+        with st.expander(
+                "Local AI Review Brief",
+                expanded=False,
+        ):
+            show_local_ai_review(
+                startup_name=company_name,
+                application_year=selected_application_year,
+            )
 
         st.caption(
             (
@@ -2170,6 +2479,7 @@ def main() -> None:
         investors_tab,
         shortlist_tab,
         data_quality_tab,
+        ai_research_tab,
     ) = st.tabs(
         [
             "Applicants",
@@ -2177,6 +2487,7 @@ def main() -> None:
             "Investors",
             "Review Workspace",
             "Data Quality",
+            "AI Research Assistant",
         ],
         default=(
             "Investors"
@@ -2767,6 +3078,46 @@ def main() -> None:
                 max_selections=10,
                 key="comparison_applications",
             )
+            st.subheader("Review selected applicant")
+
+            review_target = st.selectbox(
+                "Open an applicant",
+                options=[
+                    None,
+                    *selected_applications,
+                ],
+                format_func=lambda value: (
+                    "Select an applicant"
+                    if value is None
+                    else startup_labels[value]
+                ),
+                key="comparison_review_target",
+            )
+
+            if review_target is not None:
+                selected_application = comparison_candidates[
+                    comparison_candidates["_selection_key"].eq(
+                        review_target
+                    )
+                ].iloc[0]
+
+                reviewed_startup_name = selected_application[
+                    "Startup"
+                ]
+
+                reviewed_application_year = int(
+                    selected_application["Application Year"]
+                )
+
+                show_applicant_details(
+                    startup_name=reviewed_startup_name,
+                    application_year=reviewed_application_year,
+                )
+
+                show_startup_review_form(
+                    startup_name=reviewed_startup_name,
+                    application_year=reviewed_application_year,
+                )
 
             hidden_columns = {
                 "_company_key",
@@ -3144,6 +3495,8 @@ def main() -> None:
                 key="download_shortlist",
             )
 
+    with ai_research_tab:
+        show_ai_research_assistant()
     with data_quality_tab:
         st.caption(
             "Investment records that could not be interpreted confidently "
