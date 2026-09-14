@@ -22,6 +22,13 @@ Rules:
 - Use only_applicants only when the user explicitly asks for applicants.
 - Use only_non_applicants only when the user explicitly asks for
   startups that did not apply.
+- Use conversation_history only to resolve references in the latest
+  question, such as "these startups", "the same years", or "only
+  applicants".
+- Inherit previous filters only when the latest question clearly
+  refers to the previous conversation.
+- A standalone new question must not inherit unrelated old filters.
+- The latest user question always has priority.
 - If essential information is missing, set needs_clarification to true
   and provide one short clarification question.
 - The user may write in Turkish or English.
@@ -31,6 +38,7 @@ Rules:
 def build_query_messages(
         question: str,
         current_year: int | None = None,
+        conversation_history: list[dict] | None = None,
 ) -> list[dict]:
     cleaned_question = question.strip()
 
@@ -40,9 +48,38 @@ def build_query_messages(
     if current_year is None:
         current_year = datetime.now().year
 
+    safe_history = []
+
+    for message in (conversation_history or [])[-6:]:
+        role = message.get("role")
+        content = message.get("content")
+
+        if role not in {"user", "assistant"}:
+            continue
+
+        if not isinstance(content, str):
+            continue
+
+        history_item = {
+            "role": role,
+            "content": content[:2000],
+        }
+
+        interpreted_query = message.get(
+            "interpreted_query"
+        )
+
+        if isinstance(interpreted_query, dict):
+            history_item["interpreted_query"] = (
+                interpreted_query
+            )
+
+        safe_history.append(history_item)
+
     context = {
         "current_year": current_year,
         "amount_unit": "million USD",
+        "conversation_history": safe_history,
         "user_question": cleaned_question,
     }
 

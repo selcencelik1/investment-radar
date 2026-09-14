@@ -5,7 +5,41 @@ from decimal import Decimal
 from app.matching.investment_grouper import InvestmentGroup
 from app.parser.normalizer import normalize_startup_name
 
+SECTOR_ALIASES = {
+    "oyun": "gaming",
+    "oyun sektörü": "gaming",
+    "gaming": "gaming",
+    "fintek": "fintech",
+    "finansal teknoloji": "fintech",
+    "fintech": "fintech",
+    "sağlık": "healthtech",
+    "sağlık teknolojileri": "healthtech",
+    "healthtech": "healthtech",
+    "yapay zeka": "artificial intelligence",
+    "yapay zekâ": "artificial intelligence",
+    "ai": "artificial intelligence",
+    "artificial intelligence": "artificial intelligence",
+    "mobilite": "mobility",
+    "mobility": "mobility",
+    "e-ticaret": "e-commerce",
+    "ecommerce": "e-commerce",
+    "e-commerce": "e-commerce",
+    "saas": "saas",
+}
 
+
+def normalize_sector(value: str | None) -> str:
+    normalized = " ".join(
+        (value or "")
+        .casefold()
+        .replace("i\u0307", "i")
+        .split()
+    )
+
+    return SECTOR_ALIASES.get(
+        normalized,
+        normalized,
+    )
 def extract_record_year(record: object) -> int | None:
     announcement_date = (
         getattr(record, "announcement_date_text", None) or ""
@@ -78,12 +112,20 @@ def search_investments(
                 continue
 
         sectors = query["sectors"]
+        record_sector = normalize_sector(record.sector)
 
-        if sectors and not any(
-            contains_text(record.sector, sector)
-            for sector in sectors
-        ):
-            continue
+        if sectors:
+            normalized_sectors = [
+                normalize_sector(sector)
+                for sector in sectors
+            ]
+
+            if not any(
+                    sector in record_sector
+                    or record_sector in sector
+                    for sector in normalized_sectors
+            ):
+                continue
 
         if query["start_year"] is not None:
             if (

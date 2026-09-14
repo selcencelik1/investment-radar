@@ -687,6 +687,10 @@ def show_ai_research_assistant() -> None:
     if not question:
         return
 
+    conversation_history = list(
+        st.session_state["ai_research_messages"]
+    )
+
     st.session_state["ai_research_messages"].append({
         "role": "user",
         "content": question,
@@ -702,6 +706,7 @@ def show_ai_research_assistant() -> None:
             ):
                 research = research_investment_question(
                     question=question,
+                    conversation_history=conversation_history,
                 )
 
                 if research["clarification_question"]:
@@ -769,14 +774,19 @@ def show_ai_research_assistant() -> None:
                 "local database. Available records may not represent "
                 "a startup's complete investment history."
             )
-
+            conversation_history = list(
+                st.session_state["ai_research_messages"]
+            )
             st.session_state[
                 "ai_research_messages"
             ].append({
                 "role": "assistant",
                 "content": response_text,
                 "results": response_results,
+                "interpreted_query": research["query"],
             })
+
+            st.rerun()
 
         except (ValueError, LocalAIError) as error:
             error_text = (
@@ -793,6 +803,8 @@ def show_ai_research_assistant() -> None:
                 "content": error_text,
                 "results": [],
             })
+
+            st.rerun()
 def main() -> None:
     st.set_page_config(
         page_title="Investment Radar",

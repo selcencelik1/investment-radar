@@ -76,10 +76,12 @@ def validate_investment_query(query: dict) -> dict:
 def interpret_investment_question(
         question: str,
         current_year: int | None = None,
+        conversation_history: list[dict] | None = None,
 ) -> dict:
     messages = build_query_messages(
         question=question,
         current_year=current_year,
+        conversation_history=conversation_history,
     )
 
     query = generate_structured_response(

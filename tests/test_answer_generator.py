@@ -4,7 +4,7 @@ from app.ai.answer_generator import (
     generate_research_answer,
 )
 from app.ai.ollama_client import LocalAIError
-
+from app.ai.answer_prompt import format_reported_amount
 
 def make_answer() -> dict:
     return {
@@ -136,3 +136,19 @@ def test_assigns_all_supplied_results_as_evidence(
     )
 
     assert result["cited_result_numbers"] == [1, 2]
+
+def test_formats_amount_without_changing_its_unit():
+    assert (
+        format_reported_amount(30.079591)
+        == "30.079591 million USD"
+    )
+
+    assert (
+        format_reported_amount(0.570981)
+        == "0.570981 million USD"
+    )
+
+    assert (
+        format_reported_amount(None)
+        == "Not disclosed"
+    )

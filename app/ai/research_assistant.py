@@ -11,16 +11,31 @@ from app.database.investment_repository import (
 from app.matching.investment_grouper import (
     group_investment_records,
 )
-
+from app.ai.ollama_client import LocalAIError
 
 def research_investment_question(
         question: str,
         current_year: int | None = None,
+        conversation_history: list[dict] | None = None,
 ) -> dict:
-    query = interpret_investment_question(
-        question=question,
-        current_year=current_year,
-    )
+    interpreter_arguments = {
+        "question": question,
+        "current_year": current_year,
+    }
+
+    if conversation_history is not None:
+        interpreter_arguments["conversation_history"] = (
+            conversation_history
+        )
+
+    try:
+        query = interpret_investment_question(
+            **interpreter_arguments,
+        )
+    except LocalAIError as error:
+        raise LocalAIError(
+            f"Question interpretation failed: {error}"
+        ) from error
 
     if query["needs_clarification"]:
         return {

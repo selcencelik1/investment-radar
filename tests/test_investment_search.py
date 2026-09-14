@@ -211,3 +211,26 @@ def test_filters_by_minimum_investment_count():
         result["startup_name"]
         for result in results
     } == {"Multi Round Startup"}
+
+def test_matches_turkish_sector_with_english_source():
+    gaming = make_record(
+        1,
+        "Demo Games",
+        "Gaming",
+        2024,
+        "5",
+    )
+
+    query = make_query()
+    query["sectors"] = ["oyun"]
+    query["start_year"] = 2024
+    query["end_year"] = 2024
+
+    results = search_investments(
+        groups=[make_group(gaming)],
+        applicant_names=[],
+        query=query,
+    )
+
+    assert len(results) == 1
+    assert results[0]["startup_name"] == "Demo Games"

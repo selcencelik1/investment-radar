@@ -33,7 +33,7 @@ def generate_research_answer(
         question: str,
         interpreted_query: dict,
         results: list[dict],
-        maximum_results: int = 100,
+        maximum_results: int = 25,
 ) -> dict:
     messages = build_answer_messages(
         question=question,
@@ -42,10 +42,15 @@ def generate_research_answer(
         maximum_results=maximum_results,
     )
 
-    answer = generate_structured_response(
-        messages=messages,
-        schema=ANSWER_SCHEMA,
-    )
+    try:
+        answer = generate_structured_response(
+            messages=messages,
+            schema=ANSWER_SCHEMA,
+        )
+    except LocalAIError as error:
+        raise LocalAIError(
+            f"Answer generation failed: {error}"
+        ) from error
 
     supplied_result_count = min(
         len(results),
