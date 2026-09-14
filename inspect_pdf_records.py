@@ -13,53 +13,57 @@ REPORT_PAGE_URL = (
 
 
 def main() -> None:
-    # Rapor sayfasını indir.
+    # Download the report page.
     report_html = fetch_page(REPORT_PAGE_URL)
 
-    # PDF adresini sayfanın bağlantılarından bul.
+    # Discover the PDF URL from the links on the report page.
     pdf_urls = discover_pdf_urls(
         html=report_html,
         page_url=REPORT_PAGE_URL,
     )
 
-    print(f"Bulunan PDF sayısı: {len(pdf_urls)}")
+    print(f"PDF files found: {len(pdf_urls)}")
 
     for pdf_url in pdf_urls:
-        print(pdf_url)
+        print(f"PDF URL: {pdf_url}")
 
     if len(pdf_urls) != 1:
         raise RuntimeError(
-            "Tek PDF bulunamadı. Bağlantılar incelenmeli."
+            "Exactly one PDF was expected."
+            "The discovered links must be reviewed."
         )
 
-    # Bulunan PDF'yi indir.
+    # Download the discovered PDF.
     response = requests.get(pdf_urls[0], timeout=60)
     response.raise_for_status()
 
     if not response.content.startswith(b"%PDF-"):
-        raise RuntimeError("İndirilen içerik PDF değil.")
+        raise RuntimeError("The downloaded content is not a valid PDF.")
 
-    # PDF tablosunu oku.
+    # Extract raw investment records from the PDF tables.
     raw_records = parse_pdf_deal_records(response.content)
 
-    print(f"\nÇıkarılan işlem kaydı: {len(raw_records)}")
+    print(f"\nInvestment records extracted: {len(raw_records)}")
 
     pages = sorted({
         record["source_page"]
         for record in raw_records
     })
 
-    print(f"İşlenen sayfalar: {pages}")
+    print(f"Pages processed: {pages}")
 
-    # Ham kayıtları uygulama modeline dönüştür.
+    # Convert raw records into application models.
     records = [
         map_pdf_record(record)
         for record in raw_records
     ]
 
-    print(f"Modele dönüştürülen kayıt: {len(records)}")
+    print(
+        f"Records converted into application models: "
+        f"{len(records)}"
+    )
 
-    print("\nİLK 3 KAYIT")
+    print("\nFIRST 3 RECORDS")
 
     for record in records[:3]:
         print(record)

@@ -1,6 +1,49 @@
 import json
 from decimal import Decimal
+import re
 
+
+TURKISH_CHARACTERS = set("çğıöşüÇĞİÖŞÜ")
+
+TURKISH_WORDS = {
+    "hangi",
+    "kim",
+    "bunlar",
+    "bunlardan",
+    "göster",
+    "listele",
+    "yatırım",
+    "yatırımcı",
+    "girişim",
+    "girişimler",
+    "sektör",
+    "yıl",
+    "yılında",
+    "arasında",
+    "üzerinde",
+    "altında",
+}
+
+
+def detect_question_language(question: str) -> str:
+    if any(
+        character in TURKISH_CHARACTERS
+        for character in question
+    ):
+        return "Turkish"
+
+    words = set(
+        re.findall(
+            r"[^\W\d_]+",
+            question.casefold(),
+            flags=re.UNICODE,
+        )
+    )
+
+    if words & TURKISH_WORDS:
+        return "Turkish"
+
+    return "English"
 ANSWER_SYSTEM_PROMPT = """
 You are a local research assistant for startup investment records.
 
@@ -25,6 +68,9 @@ Rules:
 - Answer in Turkish when the user writes in Turkish.
 - Answer in English when the user writes in English.
 - Copy reported_amount exactly as supplied.
+- Write the entire answer only in required_response_language.
+- Do not choose the response language from company names, investor
+  names, source records, or previous messages.
 - Do not convert, rescale, or rename the reported amount unit.
 - Keep the answer concise and factual.
 - cited_result_numbers must contain only the supplied result numbers.
@@ -85,6 +131,9 @@ def build_answer_messages(
             len(results) > len(numbered_results)
         ),
         "search_results": numbered_results,
+        "required_response_language": (
+            detect_question_language(question)
+        ),
     }
 
     return [

@@ -4,8 +4,10 @@ from app.ai.answer_generator import (
     generate_research_answer,
 )
 from app.ai.ollama_client import LocalAIError
-from app.ai.answer_prompt import format_reported_amount
-
+from app.ai.answer_prompt import (
+    detect_question_language,
+    format_reported_amount,
+)
 def make_answer() -> dict:
     return {
         "answer": "Two matching startups were found.",
@@ -151,4 +153,26 @@ def test_formats_amount_without_changing_its_unit():
     assert (
         format_reported_amount(None)
         == "Not disclosed"
+    )
+
+def test_detects_question_language():
+    assert (
+        detect_question_language(
+            "Which gaming startups received investment in 2024?"
+        )
+        == "English"
+    )
+
+    assert (
+        detect_question_language(
+            "2024 yılında yatırım alan girişimleri göster."
+        )
+        == "Turkish"
+    )
+
+    assert (
+        detect_question_language(
+            "Hangi startuplar yatırım aldı?"
+        )
+        == "Turkish"
     )

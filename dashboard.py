@@ -618,6 +618,77 @@ def show_archive_summary() -> None:
             "Annual and quarterly reports may include the same deals. "
             "Source record counts are not unique investment counts."
         )
+
+def format_interpreted_filters(query: dict) -> str:
+    filters = []
+
+    startup_name = query.get("startup_name")
+
+    if startup_name:
+        filters.append(f"Startup: {startup_name}")
+
+    investor_name = query.get("investor_name")
+
+    if investor_name:
+        filters.append(f"Investor: {investor_name}")
+
+    sectors = query.get("sectors") or []
+
+    if sectors:
+        filters.append(
+            "Sector: " + ", ".join(sectors)
+        )
+
+    start_year = query.get("start_year")
+    end_year = query.get("end_year")
+
+    if start_year is not None and end_year is not None:
+        if start_year == end_year:
+            filters.append(f"Year: {start_year}")
+        else:
+            filters.append(
+                f"Years: {start_year}–{end_year}"
+            )
+    elif start_year is not None:
+        filters.append(f"From year: {start_year}")
+    elif end_year is not None:
+        filters.append(f"Until year: {end_year}")
+
+    minimum_amount = query.get(
+        "minimum_amount_million_usd"
+    )
+
+    if minimum_amount is not None:
+        filters.append(
+            f"Minimum amount: {minimum_amount} million USD"
+        )
+
+    maximum_amount = query.get(
+        "maximum_amount_million_usd"
+    )
+
+    if maximum_amount is not None:
+        filters.append(
+            f"Maximum amount: {maximum_amount} million USD"
+        )
+
+    minimum_count = query.get(
+        "minimum_investment_count"
+    )
+
+    if minimum_count is not None:
+        filters.append(
+            f"Minimum investment count: {minimum_count}"
+        )
+
+    if query.get("only_applicants"):
+        filters.append("Applicants only")
+
+    if query.get("only_non_applicants"):
+        filters.append("Non-applicants only")
+
+    return " · ".join(filters) or "No additional filters"
+
 def show_ai_research_assistant() -> None:
     st.caption(
         "Ask questions about startup investments, investors, "
@@ -638,6 +709,17 @@ def show_ai_research_assistant() -> None:
     for message in st.session_state["ai_research_messages"]:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            interpreted_query = message.get(
+                "interpreted_query"
+            )
+
+            if interpreted_query:
+                st.caption(
+                    "Interpreted filters: "
+                    + format_interpreted_filters(
+                        interpreted_query
+                    )
+                )
 
             results = message.get("results", [])
 
