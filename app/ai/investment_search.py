@@ -146,22 +146,48 @@ def search_investments(
         ]
 
         if minimum_amount is not None:
-            if (
-                amount is None
-                or amount < Decimal(str(minimum_amount))
-            ):
+            if amount is None:
                 continue
+
+            minimum_boundary = Decimal(
+                str(minimum_amount)
+            )
+
+            minimum_inclusive = query.get(
+                "minimum_amount_inclusive",
+                True,
+            )
+
+            if minimum_inclusive:
+                if amount < minimum_boundary:
+                    continue
+            else:
+                if amount <= minimum_boundary:
+                    continue
 
         maximum_amount = query[
             "maximum_amount_million_usd"
         ]
 
         if maximum_amount is not None:
-            if (
-                amount is None
-                or amount > Decimal(str(maximum_amount))
-            ):
+            if amount is None:
                 continue
+
+            maximum_boundary = Decimal(
+                str(maximum_amount)
+            )
+
+            maximum_inclusive = query.get(
+                "maximum_amount_inclusive",
+                True,
+            )
+
+            if maximum_inclusive:
+                if amount > maximum_boundary:
+                    continue
+            else:
+                if amount >= maximum_boundary:
+                    continue
 
         if query["only_applicants"] and not is_applicant:
             continue

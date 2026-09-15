@@ -57,6 +57,13 @@ QUERY_SCHEMA = {
         "clarification_question": {
             "type": ["string", "null"],
         },
+        "minimum_amount_inclusive": {
+            "type": "boolean",
+        },
+        "maximum_amount_inclusive": {
+            "type": "boolean",
+        },
+
     },
     "required": [
         "intent",
@@ -72,6 +79,8 @@ QUERY_SCHEMA = {
         "only_non_applicants",
         "needs_clarification",
         "clarification_question",
+        "minimum_amount_inclusive",
+        "maximum_amount_inclusive",
     ],
     "additionalProperties": False,
 }

@@ -659,8 +659,14 @@ def format_interpreted_filters(query: dict) -> str:
     )
 
     if minimum_amount is not None:
+        operator = (
+            "≥"
+            if query.get("minimum_amount_inclusive", True)
+            else ">"
+        )
+
         filters.append(
-            f"Minimum amount: {minimum_amount} million USD"
+            f"Amount {operator} {minimum_amount} million USD"
         )
 
     maximum_amount = query.get(
@@ -668,8 +674,14 @@ def format_interpreted_filters(query: dict) -> str:
     )
 
     if maximum_amount is not None:
+        operator = (
+            "≤"
+            if query.get("maximum_amount_inclusive", True)
+            else "<"
+        )
+
         filters.append(
-            f"Maximum amount: {maximum_amount} million USD"
+            f"Amount {operator} {maximum_amount} million USD"
         )
 
     minimum_count = query.get(

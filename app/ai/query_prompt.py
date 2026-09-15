@@ -31,6 +31,15 @@ Rules:
 - The latest user question always has priority.
 - If essential information is missing, set needs_clarification to true
   and provide one short clarification question.
+- For "above", "more than", or "üzerinde", set
+  minimum_amount_inclusive to false.
+- For "at least", "minimum", or "en az", set
+  minimum_amount_inclusive to true.
+- For "below", "less than", or "altında", set
+  maximum_amount_inclusive to false.
+- For "at most", "maximum", or "en fazla", set
+  maximum_amount_inclusive to true.
+- When an amount boundary is absent, its inclusive flag must be true.
 - The user may write in Turkish or English.
 """
 

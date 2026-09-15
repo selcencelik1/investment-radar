@@ -1,6 +1,6 @@
 from decimal import Decimal
 from types import SimpleNamespace
-
+import pytest
 from app.ai.investment_search import search_investments
 from app.matching.investment_grouper import InvestmentGroup
 
@@ -234,3 +234,68 @@ def test_matches_turkish_sector_with_english_source():
 
     assert len(results) == 1
     assert results[0]["startup_name"] == "Demo Games"
+
+@pytest.mark.parametrize(
+    (
+        "boundary_field",
+        "inclusive_field",
+        "inclusive",
+        "expected_names",
+    ),
+    [
+        (
+            "minimum_amount_million_usd",
+            "minimum_amount_inclusive",
+            False,
+            {"Above"},
+        ),
+        (
+            "minimum_amount_million_usd",
+            "minimum_amount_inclusive",
+            True,
+            {"Exact", "Above"},
+        ),
+        (
+            "maximum_amount_million_usd",
+            "maximum_amount_inclusive",
+            False,
+            {"Below"},
+        ),
+        (
+            "maximum_amount_million_usd",
+            "maximum_amount_inclusive",
+            True,
+            {"Below", "Exact"},
+        ),
+    ],
+)
+def test_handles_inclusive_and_exclusive_amount_boundaries(
+        boundary_field,
+        inclusive_field,
+        inclusive,
+        expected_names,
+):
+    records = [
+        make_record(1, "Below", "Gaming", 2024, "19"),
+        make_record(2, "Exact", "Gaming", 2024, "20"),
+        make_record(3, "Above", "Gaming", 2024, "21"),
+        make_record(4, "Unknown", "Gaming", 2024, None),
+    ]
+
+    query = make_query()
+    query[boundary_field] = 20
+    query[inclusive_field] = inclusive
+
+    results = search_investments(
+        groups=[
+            make_group(record)
+            for record in records
+        ],
+        applicant_names=[],
+        query=query,
+    )
+
+    assert {
+        result["startup_name"]
+        for result in results
+    } == expected_names
