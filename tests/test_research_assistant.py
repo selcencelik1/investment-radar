@@ -121,3 +121,84 @@ def test_does_not_read_database_when_clarification_is_needed(
         result["clarification_question"]
         == "Which years should be searched?"
     )
+
+def test_follow_up_keeps_previous_startups_and_each_round_count(
+    monkeypatch,
+):
+    query = make_query()
+    query["start_year"] = 2024
+
+    previous_query = make_query()
+    previous_query["start_year"] = 2024
+    previous_query["minimum_amount_million_usd"] = None
+    previous_query["minimum_investment_count"] = 2
+
+    history = [{
+        "role": "assistant",
+        "content": "Grand Games had two rounds.",
+        "interpreted_query": previous_query,
+        "results": [
+            {"startup_name": "Grand Games"},
+            {"startup_name": "Grand Games"},
+        ],
+    }]
+
+    monkeypatch.setattr(
+        "app.ai.research_assistant.interpret_investment_question",
+        lambda **kwargs: query,
+    )
+    monkeypatch.setattr(
+        "app.ai.research_assistant.get_all_investment_records",
+        lambda: [],
+    )
+    monkeypatch.setattr(
+        "app.ai.research_assistant.group_investment_records",
+        lambda records: [],
+    )
+    monkeypatch.setattr(
+        "app.ai.research_assistant.get_applicant_names",
+        lambda: [],
+    )
+
+    captured = {}
+
+    def fake_search(groups, applicant_names, query):
+        captured["query"] = query.copy()
+        return [
+            {"startup_name": "Grand Games"},
+            {"startup_name": "Agave Games"},
+        ]
+
+    monkeypatch.setattr(
+        "app.ai.research_assistant.search_investments",
+        fake_search,
+    )
+
+    result = research_investment_question(
+        question="Which of those had each round above 5 million USD?",
+        conversation_history=history,
+    )
+
+    assert captured["query"]["minimum_investment_count"] == 2
+    assert result["results"] == [
+        {"startup_name": "Grand Games"},
+    ]
+
+def test_turkish_kaci_follow_up_uses_previous_startups():
+    from app.ai.research_assistant import get_previous_result_scope
+
+    history = [{
+        "role": "assistant",
+        "content": "Grand Games had two rounds.",
+        "interpreted_query": make_query(),
+        "results": [
+            {"startup_name": "Grand Games"},
+        ],
+    }]
+
+    startup_keys, _ = get_previous_result_scope(
+        "Kaçı 5 milyon USD üzerinde yatırım aldı?",
+        history,
+    )
+
+    assert startup_keys == {"grand games"}

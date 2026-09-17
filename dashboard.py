@@ -1542,15 +1542,26 @@ def main() -> None:
 
         st.subheader("Portfolio startups")
 
-        st.dataframe(
+        event = st.dataframe(
             visible_history,
             hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key=f"investor_portfolio_{investor_key}",
             column_config={
-                "Source": st.column_config.LinkColumn(
-                    "Open source"
-                ),
+                "Source": st.column_config.LinkColumn("Open source"),
             },
         )
+
+        st.caption("Select a startup row to open its details.")
+
+        if event.selection.rows:
+            selected_row = visible_history.iloc[event.selection.rows[0]]
+            st.session_state["_selected_company"] = normalize_startup_name(
+                selected_row["Startup"]
+            )
+            st.session_state.pop("_investor_detail_key", None)
+            st.rerun()
 
         st.download_button(
             "Download investor portfolio CSV",
@@ -2474,7 +2485,7 @@ def main() -> None:
             if str(value).strip()
         })
 
-        st.sidebar.header(company_name)
+        st.header(company_name)
 
         st.write(
             "Sector: "

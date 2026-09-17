@@ -29,6 +29,7 @@ def test_interprets_question_with_structured_schema(
         monkeypatch,
 ):
     expected_query = make_query()
+    expected_query["minimum_amount_inclusive"] = False
     captured_call = {}
 
     def fake_generate(
@@ -118,3 +119,20 @@ def test_rejects_unknown_intent_value():
         match="invalid intent",
     ):
         validate_investment_query(query)
+
+def test_more_than_amount_is_exclusive_even_if_model_says_inclusive(
+    monkeypatch,
+):
+    model_query = make_query()
+    model_query["minimum_amount_inclusive"] = True
+
+    monkeypatch.setattr(
+        "app.ai.query_interpreter.generate_structured_response",
+        lambda **kwargs: model_query,
+    )
+
+    result = interpret_investment_question(
+        question="Which startups raised more than 5 million USD?",
+    )
+
+    assert result["minimum_amount_inclusive"] is False

@@ -4,7 +4,7 @@ from app.ai.ollama_client import (
 )
 from app.ai.query_prompt import build_query_messages
 from app.ai.query_schema import QUERY_SCHEMA
-
+import re
 
 VALID_INTENTS = {
     "find_startups",
@@ -13,6 +13,14 @@ VALID_INTENTS = {
     "compare_startups",
     "unknown",
 }
+STRICT_MINIMUM_AMOUNT = re.compile(
+    r"\b(?:more than|greater than|above|over)\s+"
+    r"\$?\s*\d[\d.,]*\s*"
+    r"(?:million|m\b|usd\b|dollars?\b)"
+    r"|\b\d[\d.,]*\s*milyon"
+    r"(?:\s+dolar\w*)?\s+üzerinde\b",
+    re.IGNORECASE,
+)
 
 
 def validate_investment_query(query: dict) -> dict:
@@ -88,5 +96,14 @@ def interpret_investment_question(
         messages=messages,
         schema=QUERY_SCHEMA,
     )
+
+    if (
+            query.get("minimum_amount_million_usd") is not None
+            and STRICT_MINIMUM_AMOUNT.search(question)
+    ):
+        query = {
+            **query,
+            "minimum_amount_inclusive": False,
+        }
 
     return validate_investment_query(query)
