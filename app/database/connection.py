@@ -16,7 +16,7 @@ def get_database_url():
 
     if url:
         # Neon adresinde belirtilen SSL seçenekleri korunur.
-        if url.startswith("p-cold-recipe-b4n17f7k-pooler.c-6.us-east-2.aws.neon.tech"):
+        if url.startswith("postgresql://p-cold-recipe-b4n17f7k-pooler.c-6.us-east-2.aws.neon.tech"):
             url = url.replace(
                 "postgresql://",
                 "postgresql+psycopg://",
