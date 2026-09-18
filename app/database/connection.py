@@ -7,6 +7,7 @@ from app.config import (
     DB_PASSWORD,
     DB_PORT,
     DB_USER,
+    DB_SSLMODE
 )
 
 
@@ -22,6 +23,7 @@ database_url = URL.create(
 engine = create_engine(
     database_url,
     echo=False,
+    connect_args={"sslmode": DB_SSLMODE},
 )
 
 SessionLocal = sessionmaker(

@@ -42,3 +42,5 @@ if missing:
     raise RuntimeError(
         "Missing database settings: " + ", ".join(missing)
     )
+
+DB_SSLMODE = get_db_setting("DB_SSLMODE") or "prefer"
